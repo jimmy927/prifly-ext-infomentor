@@ -5,7 +5,7 @@
  * candidate is proved with a real write instead of trusted.
  */
 
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionApi, ExtensionToolContext } from "@prifly/extension-api";
@@ -43,8 +43,8 @@ async function usable(folder: string): Promise<boolean> {
 /**
  * The folder for this call's files, made: `<scratchpad>/infomentor` when the
  * host can write it, else the extension's own folder (`api.folder`, as the
- * other prifly extensions do when the scratchpad is no use), else a folder
- * under the OS temp directory.
+ * other prifly extensions do when the scratchpad is no use), else a fresh
+ * private folder under the OS temp directory.
  */
 export async function sessionFolder(
   api: ExtensionApi | null,
@@ -57,9 +57,15 @@ export async function sessionFolder(
   const foreign = platform === "win32" && scratchpad !== undefined && !isWindowsPath(scratchpad);
   if (scratchpad !== undefined && !foreign) candidates.push(join(scratchpad, NAME));
   if (api !== null && api.folder !== "") candidates.push(join(api.folder, "files"));
-  candidates.push(join(tmpdir(), `prifly-ext-${NAME}`));
   for (const candidate of candidates) {
     if (await usable(candidate)) return candidate;
+  }
+  // Last resort: a fresh folder only this user can open (mkdtemp makes it 0700), never a shared
+  // fixed name in the temp directory that another local user could own or read.
+  try {
+    return await mkdtemp(join(tmpdir(), `prifly-ext-${NAME}-`));
+  } catch {
+    // fall through to the error below
   }
   throw new Error("No folder the host can write to was found for the file.");
 }

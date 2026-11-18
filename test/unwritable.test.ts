@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionToolContext } from "@prifly/extension-api";
@@ -78,19 +78,39 @@ test("an unexpected error is logged with its scrubbed message, and the answer ca
   }
 });
 
-test("an fs error keeps its code and path in the answer", async () => {
-  const error = Object.assign(
-    new Error("EACCES: permission denied, mkdir '/tmp/claude-1000/scratchpad'"),
-    { code: "EACCES" },
+test("an fs error keeps its path in the answer, and its code in the log", async () => {
+  const world = new World();
+  world.fetcher = async () => {
+    throw Object.assign(
+      new Error("EACCES: permission denied, mkdir '/tmp/claude-1000/scratchpad'"),
+      {
+        code: "EACCES",
+      },
+    );
+  };
+  const r = rig({ world });
+  const text = await r.call("infomentor_login", {});
+  expect(text).toBe(
+    "Not done: InfoMentor failed unexpectedly (Error: EACCES: permission denied, mkdir '/tmp/claude-1000/scratchpad').",
   );
-  expect(scrubMessage(error.message)).toBe(error.message);
+  const logged = r.fake.logs.find((l) => l.event === "tool_failed");
+  expect(logged?.fields?.["code"]).toBe("EACCES");
+});
+
+test("the last-resort folder is private to this user", async () => {
+  const api = rig({ folder: "" }).fake.api;
+  const folder = await sessionFolder(api, context(join(unwritableScratchpad(), "x")), "linux");
+  expect(existsSync(folder)).toBe(true);
+  if (process.platform !== "win32") expect(statSync(folder).mode & 0o077).toBe(0);
 });
 
 test("scrubbing drops query strings, secret pairs and long token-like runs", () => {
   expect(scrubMessage("GET http://a.example/p?q=secret#frag failed")).toBe(
     "GET http://a.example/p?[redacted] failed",
   );
-  expect(scrubMessage("cookie=abc123 and Authorization: Bearer xyz")).not.toContain("abc123");
+  const headers = scrubMessage("cookie=abc123 and Authorization: Bearer xyz");
+  expect(headers).not.toContain("abc123");
+  expect(headers).not.toContain("xyz");
   const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dBjftJeZ4CVPmB92K27uhbUJU1p1r";
   expect(scrubMessage(`bad ${jwt}`)).not.toContain("eyJzdWIi");
 });

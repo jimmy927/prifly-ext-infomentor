@@ -10,8 +10,9 @@ const MAX_LENGTH = 300;
 export function scrubMessage(message: string): string {
   const scrubbed = message
     .replace(/([a-z][a-z0-9+.-]*:\/\/[^\s?#'")]*)[?#][^\s'")]*/gi, "$1?[redacted]")
+    .replace(/\bbearer\s+[^\s,;'")]+/gi, "Bearer [redacted]")
     .replace(
-      /\b([\w-]*(?:token|secret|cookie|authorization|bearer|password|qr|session|key)[\w-]*)(\s*[=:]\s*)[^\s,;'")]+/gi,
+      /\b([\w-]*(?:token|secret|cookie|authorization|bearer|password|qr|session|key)[\w-]*)(\s*[=:]\s*)(?!\[redacted\])[^\s,;'")]+/gi,
       "$1$2[redacted]",
     )
     .replace(/(?=[A-Za-z0-9+=_-]*\d)[A-Za-z0-9+=_-]{24,}/g, "[redacted]");

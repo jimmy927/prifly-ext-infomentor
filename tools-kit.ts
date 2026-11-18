@@ -52,12 +52,21 @@ export function tool(
           return `Not signed in: ${error.message} ${LOGIN_HINT}`;
         }
         if (error instanceof InfoMentorError) return `Not done: ${error.message}`;
-        const { name, code, message } = describeError(error);
-        services.api()?.log("tool_failed", { tool: spec.name, name, code, message });
-        return `Not done: InfoMentor failed unexpectedly (${message === "" ? name : `${name}: ${message}`}).`;
+        return unexpected(services, spec.name, error);
       }
     },
   };
+}
+
+/** Logs an error nobody planned for, scrubbed, and words it for the session. */
+function unexpected(services: Services, tool: string, error: unknown): string {
+  const { name, code, message } = describeError(error);
+  try {
+    services.api()?.log("tool_failed", { tool, name, code, message });
+  } catch {
+    // A failing log must not cost the session its answer.
+  }
+  return `Not done: InfoMentor failed unexpectedly (${message === "" ? name : `${name}: ${message}`}).`;
 }
 
 export function optionalString(args: Record<string, unknown>, name: string): string | undefined {
