@@ -62,6 +62,8 @@ export class World {
   evilStart = false;
   /** The mobile sign-in bridge answers 500. */
   failBridge = false;
+  /** The pairing's code-for-token exchange answers 400. */
+  failToken = false;
 
   fetcher: FetchLike = async (url, init) => {
     const parsed = new URL(url);
@@ -240,6 +242,7 @@ export class World {
           : new Response("bad", { status: 400 }),
       [`POST ${IM}/Authentication/OAuth2/Token`]: (_call, _q, form) => {
         const grant = form.get("grant_type");
+        if (this.failToken) return new Response("Bad Request", { status: 400 });
         if (grant === "authorization_code" && form.get("code") === "CODE-1") return this.issue();
         if (grant === "refresh_token" && form.get("refresh_token") === this.refreshToken)
           return this.issue();

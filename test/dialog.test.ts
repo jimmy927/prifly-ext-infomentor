@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { SUCCESS_CLOSE_MS } from "../login";
 import { rig } from "./helpers";
 import { World } from "./world";
 
@@ -81,4 +82,70 @@ test("the link method still answers with a bankid:/// link, not a dialog", async
   const text = await r.call("infomentor_login", { method: "url" });
   expect(text).toContain("bankid:///?autostarttoken=");
   expect(r.dialogs).toHaveLength(0);
+});
+
+/** A sleep that is instant, except the success pause, which waits for `release`. */
+function heldSuccessPause(): { sleep: (ms: number) => Promise<void>; release: () => void } {
+  let release: () => void = () => undefined;
+  const hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { sleep: (ms) => (ms === SUCCESS_CLOSE_MS ? hold : Promise.resolve()), release };
+}
+
+test("after a successful pairing the dialog shows the success line, then closes itself", async () => {
+  const pause = heldSuccessPause();
+  const r = rig({ pair: true, sleep: pause.sleep });
+  await r.call("infomentor_login", {});
+  const done = await r.call("infomentor_login_check", { wait_seconds: 10 });
+  expect(done).toContain('paired as the device "prifly"');
+  const dialog = r.dialogs[0];
+  expect(dialog?.updates.at(-1)).toEqual({
+    linked: true,
+    status: 'Signed in and paired as "prifly"',
+  });
+  expect(dialog?.closedBy).toBeNull();
+  pause.release();
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(dialog?.closedBy).toBe("closed");
+});
+
+test("the reader closing the success dialog first is harmless", async () => {
+  const pause = heldSuccessPause();
+  const r = rig({ pair: true, sleep: pause.sleep });
+  await r.call("infomentor_login", {});
+  await r.call("infomentor_login_check", { wait_seconds: 10 });
+  r.dialogs[0]?.cancel();
+  pause.release();
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(r.dialogs[0]?.closedBy).toBe("cancelled");
+});
+
+test("a pairing that fails keeps the dialog open", async () => {
+  const world = new World();
+  world.failToken = true;
+  const r = rig({ world, pair: true });
+  await r.call("infomentor_login", {});
+  const text = await r.call("infomentor_login_check", { wait_seconds: 10 });
+  expect(text).toContain("pairing failed");
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(r.dialogs[0]?.updates.at(-1)).toEqual({ status: "Signed in, but the pairing failed" });
+  expect(r.dialogs[0]?.closedBy).toBeNull();
+});
+
+test("a login nobody approved keeps the dialog open", async () => {
+  const world = new World();
+  world.cancelOrder = true;
+  const r = rig({ world, pair: true });
+  await r.call("infomentor_login", {});
+  await r.call("infomentor_login_check", { wait_seconds: 10 });
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(r.dialogs[0]?.updates.at(-1)?.status).toBe(
+    "No approval in time. Close this and try again.",
+  );
+  expect(r.dialogs[0]?.closedBy).toBeNull();
 });

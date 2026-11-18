@@ -21,9 +21,13 @@ type Dialog = {
   handle: PairHandle;
   /** The reader cancelled it, or a new login replaced it. */
   cancelled: boolean;
+  /** `handle.close` was already called; a second call is skipped. */
+  closed: boolean;
   done: Promise<string>;
 };
 
+/** How long the success line stays on screen before the dialog closes itself. */
+export const SUCCESS_CLOSE_MS = 1500;
 const WAITING = "Waiting for the BankID app";
 /** BankID QR orders run out after about 30 s; this keeps the dialog going about 3 minutes. */
 const MAX_DIALOG_ORDERS = 6;
@@ -92,9 +96,10 @@ export class LoginManager {
       askPhone: false,
     });
     handle.update({ qr: first.order.qrData, status: WAITING });
-    const dialog: Dialog = { handle, cancelled: false, done: Promise.resolve("") };
+    const dialog: Dialog = { handle, cancelled: false, closed: false, done: Promise.resolve("") };
     void handle.closed.then((how) => {
       if (how === "cancelled") dialog.cancelled = true;
+      dialog.closed = true;
     });
     dialog.done = this.runDialog(dialog, first);
     this.dialog = dialog;
@@ -116,6 +121,13 @@ export class LoginManager {
     this.dialog = null;
     if (dialog === null) return;
     dialog.cancelled = true;
+    this.closeHandle(dialog);
+  }
+
+  /** Closes the dialog once; harmless when it is already closed. */
+  private closeHandle(dialog: Dialog): void {
+    if (dialog.closed) return;
+    dialog.closed = true;
     dialog.handle.close();
   }
 
@@ -203,11 +215,13 @@ export class LoginManager {
   private async finishDialog(dialog: Dialog, attempt: Attempt): Promise<string> {
     dialog.handle.update({ qr: null, status: "Approved; signing in to InfoMentor" });
     const text = await this.complete(attempt);
-    dialog.handle.update(
-      text.includes("paired as the device")
-        ? { linked: true, status: 'Signed in and paired as "prifly"' }
-        : { status: "Signed in, but the pairing failed" },
-    );
+    if (text.includes("paired as the device")) {
+      dialog.handle.update({ linked: true, status: 'Signed in and paired as "prifly"' });
+      // Not awaited: the login's answer does not wait for the dialog to go.
+      void this.sleep(SUCCESS_CLOSE_MS).then(() => this.closeHandle(dialog));
+    } else {
+      dialog.handle.update({ status: "Signed in, but the pairing failed" });
+    }
     return text;
   }
 
