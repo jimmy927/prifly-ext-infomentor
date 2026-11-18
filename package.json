@@ -1,0 +1,21 @@
+{
+  "name": "prifly-ext-infomentor",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "A prifly extension that lets sessions read your InfoMentor Hub (Stockholm stad guardian): timetable, news, calendar, notifications and attachments.",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "check": "biome check ."
+  },
+  "dependencies": {
+    "uqr": "^0.1.2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "@prifly/extension-api": "github:jimmy927/prifly-extension-api#v0.18.1",
+    "@types/bun": "^1.1.14",
+    "typescript": "^7.0.2"
+  }
+}

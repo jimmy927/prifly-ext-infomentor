@@ -1,0 +1,7 @@
+{
+  "id": "infomentor",
+  "name": "InfoMentor",
+  "description": "Read your children's InfoMentor Hub (Stockholm stad guardian): timetable, news, calendar, notifications and attachments. Sign in once with BankID; it renews itself afterwards.",
+  "version": "0.1.0",
+  "main": "index.ts"
+}
