@@ -3,8 +3,8 @@
  * say how things stand, and revoke the pairing (the only write, behind a card).
  */
 
-import { join } from "node:path";
 import type { ExtensionTool } from "@prifly/extension-api";
+import { sessionFolder } from "./folder";
 import { DEFAULT_WAIT_SECONDS, MAX_WAIT_SECONDS } from "./login";
 import { InfoMentorError } from "./saml";
 import { optionalInt, optionalString, type Services, tool } from "./tools-kit";
@@ -38,7 +38,7 @@ export function authTools(services: Services | null): ExtensionTool[] {
         const method = optionalString(args, "method") ?? "qr";
         if (method !== "qr" && method !== "url")
           throw new InfoMentorError("method must be qr or url.");
-        return await s.login.start(method, join(ctx.scratchpad, "infomentor"));
+        return await s.login.start(method, await sessionFolder(s.api(), ctx));
       },
     ),
     tool(

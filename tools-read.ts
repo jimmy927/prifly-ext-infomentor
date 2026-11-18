@@ -5,9 +5,10 @@
  */
 
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ExtensionTool } from "@prifly/extension-api";
+import { sessionFolder } from "./folder";
 import {
   mergeNews,
   renderCalendar,
@@ -184,8 +185,7 @@ function attachmentTool(services: Services | null): ExtensionTool {
         requiredString(args, "news_id"),
         requiredString(args, "attachment_id"),
       );
-      const folder = join(ctx.scratchpad, "infomentor");
-      await mkdir(folder, { recursive: true });
+      const folder = await sessionFolder(s.api(), ctx);
       const path = join(
         folder,
         `${safeName(requiredString(args, "attachment_id"))}-${safeName(file.name)}`,

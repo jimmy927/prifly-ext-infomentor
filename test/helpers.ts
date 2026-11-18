@@ -15,9 +15,17 @@ export type Rig = {
 };
 
 export function rig(
-  options: { confirm?: boolean; world?: World; secrets?: Map<string, string> } = {},
+  options: {
+    confirm?: boolean;
+    world?: World;
+    secrets?: Map<string, string>;
+    folder?: string;
+  } = {},
 ): Rig {
-  const fake = fakeApi(options.confirm === undefined ? {} : { confirm: options.confirm });
+  const fake = fakeApi({
+    ...(options.confirm === undefined ? {} : { confirm: options.confirm }),
+    ...(options.folder === undefined ? {} : { folder: options.folder }),
+  });
   const secrets = options.secrets ?? new Map<string, string>();
   const api: ExtensionApi = {
     ...fake.api,
@@ -44,7 +52,9 @@ export function rig(
 }
 
 /** Logs in through the two login tools with the fake BankID approving at once. */
-export async function loggedIn(options: { confirm?: boolean; world?: World } = {}): Promise<Rig> {
+export async function loggedIn(
+  options: { confirm?: boolean; world?: World; folder?: string } = {},
+): Promise<Rig> {
   const r = rig(options);
   await r.call("infomentor_login", { method: "qr" });
   const text = await r.call("infomentor_login_check", { wait_seconds: 10 });

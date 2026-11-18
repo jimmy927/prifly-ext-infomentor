@@ -5,6 +5,7 @@ import type { Hub } from "./hub";
 import type { LoginManager } from "./login";
 import type { MobileAuth, PairingStore } from "./mobile";
 import { InfoMentorError, LoginRequiredError } from "./saml";
+import { describeError } from "./scrub";
 import type { HubSession } from "./session";
 import { isDate } from "./time";
 
@@ -51,7 +52,9 @@ export function tool(
           return `Not signed in: ${error.message} ${LOGIN_HINT}`;
         }
         if (error instanceof InfoMentorError) return `Not done: ${error.message}`;
-        return `Not done: InfoMentor failed unexpectedly (${error instanceof Error ? error.name : "unknown"}).`;
+        const { name, code, message } = describeError(error);
+        services.api()?.log("tool_failed", { tool: spec.name, name, code, message });
+        return `Not done: InfoMentor failed unexpectedly (${message === "" ? name : `${name}: ${message}`}).`;
       }
     },
   };
