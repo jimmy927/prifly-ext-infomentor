@@ -20,7 +20,7 @@ export function authTools(services: Services | null): ExtensionTool[] {
       {
         name: "infomentor_login",
         description:
-          "Starts a Stockholm BankID login to InfoMentor (guardian / vardnadshavare). Returns an autostart link and/or a QR image path for the reader to approve on their phone, then call infomentor_login_check immediately. Needed once; afterwards the extension renews itself without BankID.",
+          "Starts a Stockholm BankID login to InfoMentor (guardian / vardnadshavare). With qr, prifly's window shows a live BankID QR code in a dialog over this session that renews itself and finishes the sign-in on its own once the reader approves; on an older prifly it returns a QR image path instead. With url, an autostart link for the phone. Then call infomentor_login_check for the result. Needed once; afterwards the extension renews itself without BankID.",
         inputSchema: {
           type: "object",
           properties: {
@@ -28,7 +28,7 @@ export function authTools(services: Services | null): ExtensionTool[] {
               type: "string",
               enum: ["qr", "url"],
               description:
-                "qr (default): animated QR image to scan from a screen. url: autostart link to open on the phone that has BankID.",
+                "qr (default): a live QR code to scan from the screen. url: autostart link to open on the phone that has BankID.",
             },
           },
           additionalProperties: false,
@@ -38,7 +38,14 @@ export function authTools(services: Services | null): ExtensionTool[] {
         const method = optionalString(args, "method") ?? "qr";
         if (method !== "qr" && method !== "url")
           throw new InfoMentorError("method must be qr or url.");
-        return await s.login.start(method, await sessionFolder(s.api(), ctx));
+        const api = s.api();
+        const pair = api?.pair;
+        if (method === "qr" && pair !== undefined && api?.features?.includes("pair-dialog")) {
+          const text = await s.login.startDialog((spec) => pair(spec), ctx.session);
+          void s.login.dialogDone?.then(() => s.refreshStatus());
+          return text;
+        }
+        return await s.login.start(method, await sessionFolder(api, ctx));
       },
     ),
     tool(
@@ -46,7 +53,7 @@ export function authTools(services: Services | null): ExtensionTool[] {
       {
         name: "infomentor_login_check",
         description:
-          "Follows up infomentor_login: polls the BankID order (refreshing the QR image each poll) for up to wait_seconds. When the reader has approved, completes the sign-in and pairs this extension as an InfoMentor app device named prifly. Call again while it says still waiting.",
+          "Follows up infomentor_login: waits up to wait_seconds for the login (with a QR image instead of the dialog, it polls the order and refreshes the image). When the reader has approved, completes the sign-in and pairs this extension as an InfoMentor app device named prifly. Call again while it says still waiting.",
         inputSchema: {
           type: "object",
           properties: {
