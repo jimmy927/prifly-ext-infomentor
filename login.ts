@@ -37,6 +37,7 @@ export const DEFAULT_WAIT_SECONDS = 20;
 
 export class LoginManager {
   private attempt: Attempt | null = null;
+  private checking = false;
   private readonly sleep: (ms: number) => Promise<void>;
 
   private readonly deps: LoginDeps;
@@ -84,6 +85,17 @@ export class LoginManager {
 
   /** Polls for up to `waitSeconds`; finishes the login when the reader has approved. */
   async check(waitSeconds: number): Promise<string> {
+    // Two overlapping checks could both see OK and pair twice.
+    if (this.checking) return "A login check is already running; wait for its answer.";
+    this.checking = true;
+    try {
+      return await this.poll(waitSeconds);
+    } finally {
+      this.checking = false;
+    }
+  }
+
+  private async poll(waitSeconds: number): Promise<string> {
     const attempt = this.attempt;
     if (attempt === null) {
       return "No login is in progress. Call `infomentor_login` to start one.";

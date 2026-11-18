@@ -89,6 +89,25 @@ test("a pairing InfoMentor rejects asks for a new BankID login and says so in th
   expect(first.secrets.has("pairing")).toBe(true);
 });
 
+test("a fresh install says not paired, not rejected, on its first read", async () => {
+  const r = rig();
+  const text = await r.call("infomentor_pupils");
+  expect(text).toContain("Not signed in");
+  expect(r.fake.statuses.at(-1)).toBe("Not paired: log in with BankID");
+  expect(await r.call("infomentor_status")).toBe("Not paired: log in with BankID.");
+});
+
+test("two overlapping login checks pair only once", async () => {
+  const r = rig();
+  await r.call("infomentor_login", {});
+  const [a, b] = await Promise.all([
+    r.call("infomentor_login_check", { wait_seconds: 10 }),
+    r.call("infomentor_login_check", { wait_seconds: 10 }),
+  ]);
+  expect([a, b].filter((t) => t.includes("already running"))).toHaveLength(1);
+  expect(r.world.callsTo("/Authentication/OAuth2/Token")).toHaveLength(1);
+});
+
 test("redirects are never followed, and the bearer reaches only the app's token endpoints", async () => {
   const first = await loggedIn();
   const later = restarted(first);

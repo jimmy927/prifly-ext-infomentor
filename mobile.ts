@@ -16,6 +16,8 @@ import {
   HUB_ORIGIN,
   InfoMentorError,
   LoginRequiredError,
+  NotPairedError,
+  PairingRejectedError,
   validateAuthUrl,
 } from "./saml";
 
@@ -182,7 +184,7 @@ export class MobileAuth {
   async refresh(pairing: Pairing): Promise<Pairing> {
     const hop = await this.refreshRequest(pairing);
     if (hop.status === 400 || hop.status === 401) {
-      throw new LoginRequiredError(
+      throw new PairingRejectedError(
         "InfoMentor rejected the stored pairing: log in with BankID again.",
       );
     }
@@ -215,15 +217,14 @@ export class MobileAuth {
    */
   async renewHub(): Promise<CookieJar> {
     let pairing = await this.store.load();
-    if (pairing === null)
-      throw new LoginRequiredError("InfoMentor is not paired: log in with BankID.");
+    if (pairing === null) throw new NotPairedError("InfoMentor is not paired: log in with BankID.");
     pairing = await this.withAccess(pairing);
     let bridge = await this.bridge(pairing);
     if (bridge.status === 401) {
       pairing = await this.refresh(pairing);
       bridge = await this.bridge(pairing);
       if (bridge.status === 401) {
-        throw new LoginRequiredError(
+        throw new PairingRejectedError(
           "InfoMentor rejected the access after a refresh: log in again.",
         );
       }

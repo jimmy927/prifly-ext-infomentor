@@ -29,6 +29,16 @@ export class LoginRequiredError extends InfoMentorError {
   override readonly name: string = "LoginRequiredError";
 }
 
+/** There is no pairing at all (never logged in, or revoked). */
+export class NotPairedError extends LoginRequiredError {
+  override readonly name: string = "NotPairedError";
+}
+
+/** InfoMentor refused the stored pairing's tokens. */
+export class PairingRejectedError extends LoginRequiredError {
+  override readonly name: string = "PairingRejectedError";
+}
+
 /** HTTPS on an InfoMentor or Stockholm stad host, or an error. Returns the resolved URL. */
 export function validateAuthUrl(url: string, base?: string): string {
   let parsed: URL;

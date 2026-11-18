@@ -8,7 +8,7 @@
 import type { CookieJar } from "./http";
 import type { MobileAuth } from "./mobile";
 import type { PupilState } from "./pupils";
-import { LoginRequiredError } from "./saml";
+import { LoginRequiredError, NotPairedError, PairingRejectedError } from "./saml";
 
 /** What the status line says about the connection. */
 export type Standing = "not-paired" | "paired" | "signed-in" | "rejected";
@@ -66,7 +66,8 @@ export class HubSession {
     try {
       this.jar = await this.mobile.renewHub();
     } catch (error) {
-      if (error instanceof LoginRequiredError) this.onStanding("rejected");
+      if (error instanceof NotPairedError) this.onStanding("not-paired");
+      else if (error instanceof PairingRejectedError) this.onStanding("rejected");
       throw error;
     }
     this.onStanding("signed-in");
