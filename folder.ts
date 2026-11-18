@@ -22,6 +22,11 @@ function scratchpadOf(ctx: ExtensionToolContext): string | undefined {
   }
 }
 
+/** A Windows path (drive or UNC): the only kind a Windows host can use as a scratchpad. */
+export function isWindowsPath(path: string): boolean {
+  return /^[A-Za-z]:[\\/]/.test(path) || path.startsWith("\\\\");
+}
+
 /** Makes the folder and writes then removes a probe file in it; false when the host cannot. */
 async function usable(folder: string): Promise<boolean> {
   try {
@@ -44,10 +49,13 @@ async function usable(folder: string): Promise<boolean> {
 export async function sessionFolder(
   api: ExtensionApi | null,
   ctx: ExtensionToolContext,
+  platform: string = process.platform,
 ): Promise<string> {
   const candidates: string[] = [];
   const scratchpad = scratchpadOf(ctx);
-  if (scratchpad !== undefined) candidates.push(join(scratchpad, NAME));
+  // A WSL session's /tmp/... would be made on the Windows drive, where the session cannot open it.
+  const foreign = platform === "win32" && scratchpad !== undefined && !isWindowsPath(scratchpad);
+  if (scratchpad !== undefined && !foreign) candidates.push(join(scratchpad, NAME));
   if (api !== null && api.folder !== "") candidates.push(join(api.folder, "files"));
   candidates.push(join(tmpdir(), `prifly-ext-${NAME}`));
   for (const candidate of candidates) {

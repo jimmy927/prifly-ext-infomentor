@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionToolContext } from "@prifly/extension-api";
+import { isWindowsPath, sessionFolder } from "../folder";
 import { scrubMessage } from "../scrub";
 import { loggedIn, rig } from "./helpers";
 import { NEWS, World } from "./world";
@@ -107,4 +108,20 @@ test("a scratchpad the host cannot write: an attachment is saved in the extensio
   const path = / to (\S+Lista\.pdf)$/.exec(text)?.[1] ?? "";
   expect(path.startsWith(join(folder, "files"))).toBe(true);
   expect(existsSync(path)).toBe(true);
+});
+
+test("on win32 a posix-style scratchpad is skipped, other hosts use it", async () => {
+  const folder = mkdtempSync(join(tmpdir(), "im-ext-folder-"));
+  const api = rig({ folder }).fake.api;
+  const posix = join(mkdtempSync(join(tmpdir(), "im-posix-")), "x");
+  expect(await sessionFolder(api, context(posix), "win32")).toBe(join(folder, "files"));
+  expect(existsSync(posix)).toBe(false);
+  expect(await sessionFolder(api, context(posix), "linux")).toBe(join(posix, "infomentor"));
+});
+
+test("Windows paths (drive or UNC) count as Windows, posix ones do not", () => {
+  expect(isWindowsPath("C:\\Users\\x\\scratch")).toBe(true);
+  expect(isWindowsPath("c:/Users/x")).toBe(true);
+  expect(isWindowsPath("\\\\wsl$\\Ubuntu\\tmp")).toBe(true);
+  expect(isWindowsPath("/tmp/claude-1000/x")).toBe(false);
 });
